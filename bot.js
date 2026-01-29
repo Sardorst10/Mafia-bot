@@ -1,75 +1,86 @@
- const { Telegraf, Markup, session } = require('telegraf');
-const http = require('http');
+import logging
+import asyncio
+import random
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-const bot = new Telegraf('8543455532:AAEJHCJ8K-K7FzIwwrf0uIfdujxKZeMu1bo');
-bot.use(session());
+API_TOKEN = '8543455532:AAEJHCJ8K-K7FzIwwrf0uIfdujxKZeMu1bo'
 
-const db = {}; // Ma'lumotlar bazasi
+logging.basicConfig(level=logging.INFO)
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher()
 
-const strings = {
-    uz: { name: "<b>Mafia Boss</b>", join: "Qo'shilish ✅", start: "Boshlash 🚀", shop: "Do'kon 🛒", hide: "Mafiyani yashirish (80💰)", info: "Profil 👤", gr_err: "❌ Bu buyruq faqat guruhda ishlaydi!", role: "Sizning rolingiz:" },
-    ru: { name: "<b>Mafia Boss</b>", join: "Присоединиться ✅", start: "Начать 🚀", shop: "Магазин 🛒", hide: "Скрыть мафию (80💰)", info: "Профиль 👤", gr_err: "❌ Команда только для групп!", role: "Ваша роль:" },
-    en: { name: "<b>Mafia Boss</b>", join: "Join ✅", start: "Start 🚀", shop: "Shop 🛒", hide: "Hide Mafia (80💰)", info: "Profile 👤", gr_err: "❌ Group only command!", role: "Your role:" },
-    tr: { name: "<b>Mafia Boss</b>", join: "Katıl ✅", start: "Başlat 🚀", shop: "Mağaza 🛒", hide: "Mafyayı gizle (80💰)", info: "Profil 👤", gr_err: "❌ Sadece grup komutu!", role: "Rolünüz:" },
-    az: { name: "<b>Mafia Boss</b>", join: "Qoşul ✅", start: "Başlat 🚀", shop: "Mağaza 🛒", hide: "Mafiyanı gizlə (80💰)", info: "Profil 👤", gr_err: "❌ Yalnız qrup komandası!", role: "Rolunuz:" },
-    kg: { name: "<b>Mafia Boss</b>", join: "Кошулуу ✅", start: "Баштоо 🚀", shop: "Дүкөн 🛒", hide: "Мафияны жашыруу (80💰)", info: "Профиль 👤", gr_err: "❌ Топ үчүн гана!", role: "Сиздин ролуңуз:" },
-    kz: { name: "<b>Mafia Boss</b>", join: "Қосылу ✅", start: "Бастау 🚀", shop: "Дүкен 🛒", hide: "Мафияны жасыру (80💰)", info: "Профиль 👤", gr_err: "❌ Тек топқа арналған!", role: "Сіздің рөліңіз:" },
-    tj: { name: "<b>Mafia Boss</b>", join: "Пайваст шудан ✅", start: "Оғоз 🚀", shop: "Дӯкон 🛒", hide: "Пинҳон кардани мафия (80💰)", info: "Профил 👤", gr_err: "❌ Танҳо барои гурӯҳ!", role: "Нақши шумо:" },
-    de: { name: "<b>Mafia Boss</b>", join: "Beitreten ✅", start: "Starten 🚀", shop: "Shop 🛒", hide: "Mafia verstecken (80💰)", info: "Profil 👤", gr_err: "❌ Nur Gruppenbefehl!", role: "Deine Rolle:" },
-    fr: { name: "<b>Mafia Boss</b>", join: "Rejoindre ✅", start: "Démarrer 🚀", shop: "Boutique 🛒", hide: "Cacher la Mafia (80💰)", info: "Profil 👤", gr_err: "❌ Commande de groupe uniquement!", role: "Votre rôle:" }
-};
+# O'yin ma'lumotlari
+game_data = {
+    "is_joinable": False,
+    "players": {}, # {user_id: {"name": str, "role": str, "is_alive": bool}}
+    "phase": "lobby" # lobby, night, day
+}
 
-const getU = (id, name) => {
-    if (!db[id]) db[id] = { money: 100, rating: 0, wins: 0, games: 0, items: [], lang: 'uz', name: name };
-    return db[id];
-};
+def assign_roles(player_ids):
+    count = len(player_ids)
+    roles = ["Mafia"] * (count // 4 if count >= 4 else 1)
+    roles.append("Sherif")
+    roles.append("Doktor")
+    while len(roles) < count:
+        roles.append("Fuqaro")
+    
+    random.shuffle(roles)
+    return roles
 
-bot.start((ctx) => {
-    if (ctx.chat.type !== 'private') return;
-    getU(ctx.from.id, ctx.from.first_name);
-    ctx.reply("🌐 Select Language / Tilni tanlang:", Markup.inlineKeyboard([
-        [Markup.button.callback('🇺🇿 UZ', 'set_uz'), Markup.button.callback('🇷🇺 RU', 'set_ru'), Markup.button.callback('🇺🇸 EN', 'set_en'), Markup.button.callback('🇹🇷 TR', 'set_tr')],
-        [Markup.button.callback('🇦🇿 AZ', 'set_az'), Markup.button.callback('🇰🇬 KG', 'set_kg'), Markup.button.callback('🇰🇿 KZ', 'set_kz'), Markup.button.callback('🇹🇯 TJ', 'set_tj')],
-        [Markup.button.callback('🇩🇪 DE', 'set_de'), Markup.button.callback('🇫🇷 FR', 'set_fr')]
-    ]));
-});
+@dp.message(Command("start_lobby"))
+async def start_lobby(message: types.Message):
+    game_data["is_joinable"] = True
+    game_data["players"] = {}
+    await message.answer("O'yin uchun ro'yxatga olish boshlandi! /join buyrug'ini bering.")
 
-bot.action(/set_(.+)/, (ctx) => {
-    const lang = ctx.match[1];
-    getU(ctx.from.id).lang = lang;
-    const s = strings[lang] || strings.uz;
-    ctx.replyWithHTML(s.name, Markup.keyboard([[s.shop, s.info]]).resize());
-});
+@dp.message(Command("join"))
+async def join_game(message: types.Message):
+    if not game_data["is_joinable"]:
+        return await message.answer("Hozircha hech qanday o'yin ochilmagan.")
+    
+    user_id = message.from_user.id
+    if user_id not in game_data["players"]:
+        game_data["players"][user_id] = {"name": message.from_user.full_name, "is_alive": True}
+        await message.answer(f"{message.from_user.first_name} qo'shildi! Soni: {len(game_data['players'])}")
 
-bot.hears(["Profil 👤", "Профиль 👤", "Profile 👤", "Profil 👤", "Profiil 👤", "Profilo 👤"], (ctx) => {
-    const u = getU(ctx.from.id, ctx.from.first_name);
-    ctx.replyWithHTML(`👤 <b>Ism:</b> ${u.name}\n💰 <b>Pul:</b> ${u.money}💰\n🏆 <b>Reyting:</b> ${u.rating}\n🎮 <b>O'yinlar:</b> ${u.games}\n🥇 <b>G'alabalar:</b> ${u.wins}`);
-});
+@dp.message(Command("start_game"))
+async def start_game(message: types.Message):
+    player_ids = list(game_data["players"].keys())
+    if len(player_ids) < 4:
+        return await message.answer("Kamida 4 kishi kerak!")
 
-let lobby = {};
-bot.command('join', (ctx) => {
-    if (ctx.chat.type === 'private') return ctx.reply(strings.uz.gr_err);
-    const gid = ctx.chat.id;
-    if (!lobby[gid]) lobby[gid] = [];
-    if (!lobby[gid].find(p => p.id === ctx.from.id)) {
-        lobby[gid].push({ id: ctx.from.id, name: ctx.from.first_name });
-        ctx.reply(`✅ ${ctx.from.first_name} qo'shildi! Jami: ${lobby[gid].length}`);
-    }
-});
+    game_data["is_joinable"] = False
+    roles = assign_roles(player_ids)
+    
+    for p_id, role in zip(player_ids, roles):
+        game_data["players"][p_id]["role"] = role
+        try:
+            await bot.send_message(p_id, f"Sizning rolingiz: **{role}**")
+        except:
+            await message.answer(f"{game_data['players'][p_id]['name']} botga start bosmagan!")
 
-bot.command('run', (ctx) => {
-    const gid = ctx.chat.id;
-    if (ctx.chat.type === 'private' || !lobby[gid] || lobby[gid].length < 3) return ctx.reply("Kamida 3 kishi /join qilishi kerak!");
-    lobby[gid].forEach((p) => {
-        getU(p.id, p.name).games += 1;
-        const u = getU(p.id);
-        const s = strings[u.lang] || strings.uz;
-        bot.telegram.sendMessage(p.id, `🎮 ${s.name}\n${s.role} Tinch aholi 🏘 (Namuna)`);
-    });
-    ctx.reply("🎲 Rollar shaxsiy xabarlarga yuborildi. O'yinni boshlang!");
-    lobby[gid] = [];
-});
+    await message.answer("Rollar tarqatildi. Shaharda tun tushmoqda... 🌃")
+    await start_night_phase(message.chat.id)
 
-http.createServer((req, res) => { res.write("Mafia Boss Active"); res.end(); }).listen(process.env.PORT || 3000);
-bot.launch();
-         
+async def start_night_phase(chat_id):
+    game_data["phase"] = "night"
+    await bot.send_message(chat_id, "Tun boshlandi. Mafia o'z qurbonini tanlamoqda...")
+    # Bu yerda Mafia uchun tugmalar chiqarish va ovoz olish mantiqi bo'ladi
+
+@dp.message(Command("status"))
+async def check_status(message: types.Message):
+    text = "Tirik o'yinchilar:\n"
+    for p in game_data["players"].values():
+        if p["is_alive"]:
+            text += f"- {p['name']}\n"
+    await message.answer(text)
+
+async def main():
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+        
