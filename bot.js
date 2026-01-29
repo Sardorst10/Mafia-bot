@@ -7,7 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # --- KONFIGURATSIYA ---
-API_TOKEN = '8543455532:AAEJHCJ8K-K7FzIwwrf0uIfdujxKZeMu1bo' # @BotFather dan olgan tokenni yozing
+API_TOKEN = '8543455532:AAFS_bmtXhD-Dem8MP0IqJUht9cJJUrMmF8' # @BotFather dan olgan tokenni yozing
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
