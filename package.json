@@ -1,15 +1,14 @@
 {
-  "name": "mafia-bot",
+  "name": "mafia-Boss-bot",
   "version": "1.0.0",
-  "description": "Telegram mafia bot",
+  "description": "Mafia Boss  Bot",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.64.0"
-  },
-  "author": "Sardorst10",
-  "license": "ISC"
+    "telegraf": "^4.12.0"
+  }
 }
+
 
